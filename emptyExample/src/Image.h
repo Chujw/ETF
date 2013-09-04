@@ -3,7 +3,7 @@
 #include "sob.h"
 #include "EdgeTangentFlow.h"
 
-#define ITER_ETF 3	// try twice for now
+#define ITER_ETF 5	// try twice for now
 //#define PATH "data/star.bmp"
 
 class Image{

@@ -91,11 +91,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\BilateralFilter.cpp" />
     <ClCompile Include="src\Image.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\testApp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\BilateralFilter.h" />
     <ClInclude Include="src\EdgeTangentFlow.h" />
     <ClInclude Include="src\Gaussian.h" />
     <ClInclude Include="src\Image.h" />

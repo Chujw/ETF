@@ -2,14 +2,27 @@
 
 //--------------------------------------------------------------
 void testApp::setup(){
-	img.getEdgeMap();
+	edge_map = img.getEdgeMap();
 	SrcImage = img.getSrcImage();
 	grad_map = img.getGradMap();
 	ETF_map = img.getETFMap(grad_map);
+	canvas.allocate(ofGetWidth(),ofGetHeight(),OF_IMAGE_GRAYSCALE);
+	for(int i=0;i<ofGetWidth()*ofGetHeight();i++)
+		canvas.getPixelsRef()[i]=255;
+	marker = new int[ofGetWidth()*ofGetHeight()];
+	mark_count = 0;
 	snapCounter = 0;
-	direction.set(1,0); // point to right
-	bot_pos.set(0,100);
-	bot_startpos.set(bot_pos);
+	timestep_dir_count = 0;
+	timestep_coli_count = 0;
+	distributeBots();
+	int index = bot_pos.x+bot_pos.y*ofGetWidth();
+	direction = ETF_map[index]; 
+	last_direction = direction;
+	last_bot_pos = bot_pos;
+	//bot_startpos.set(bot_pos);
+	
+
+	//canvas.clone(edge_map);
 }
 
 //--------------------------------------------------------------
@@ -19,7 +32,7 @@ void testApp::update(){
 
 //--------------------------------------------------------------
 void testApp::draw(){
-	ofSetColor(0);
+	ofSetColor(255);
 	//SrcImage.draw(0,0);
 	//ETF_Visual.draw(0,0);
 
@@ -31,38 +44,112 @@ void testApp::draw(){
 	line.addVertex(bot_pos.x,bot_pos.y);
 	if(UpdateBot())
 	{
-		line.addVertex(bot_pos.x,bot_pos.y);
-		line.draw();
-		
+		//line.addVertex(bot_pos.x,bot_pos.y);
+		//line.draw();
+		//ofSetColor(255,0,0);
+		//ofEllipse(bot_startpos.x,bot_startpos.y,2,2);
+		int index = floor(0.5+bot_pos.x)+floor(0.5+bot_pos.y)*ofGetWidth();
+		if(index>=0 && index<ofGetWidth()*ofGetHeight())
+		{
+			canvas.getPixelsRef()[index]=COLOR;
+			marker[index] = mark_count;
+		}
+		timestep_dir_count++;
+		timestep_coli_count++;
 	}
+	else
+	{
+		timestep_dir_count=0;
+		timestep_coli_count=0;
+	}
+	canvas.reloadTexture();
+	canvas.draw(0,0);
+	//edge_map.draw(0,0);
 }
 
 
 bool testApp::UpdateBot()
 {
 	int index = floor(bot_pos.x+0.5)+floor(bot_pos.y+0.5)*ofGetWidth();
-	if(index>=0 && index<ofGetWidth()*ofGetHeight())
+	if(bot_pos.x>=0 && floor(0.5+bot_pos.x)<ofGetWidth() && bot_pos.y>=0 && floor(0.5+bot_pos.y)<ofGetHeight())// NOT out of window yet
 	{
-		if(ETF_map[index].length()>0)	// change direction based on ETF
+		if(timestep_dir_count>TIMESTEP_DIR)	// update direction after ... TIMESTEPs
 		{
-			direction = ETF_map[index] + direction;
-			direction.normalize();
+			timestep_dir_count = 0;
+			if(ETF_map[index].length()>0)	// get new direction based on ETF
+			{
+				last_direction = direction;
+				direction = ETF_map[index] + direction;
+				direction.normalize();
+				if(last_direction.dot(direction)<0)
+				{
+					direction*=-1;
+				}
+			}
 		}
-		bot_pos += SPEED * direction;
-		if(int(bot_startpos.x)==int(bot_pos.x) && int(bot_startpos.y) == int(bot_pos.y))	// back to start
+		last_bot_pos = bot_pos;
+		bot_pos += SPEED * direction;	// update position
+		if(timestep_coli_count>TIMESTEP_COLI)
 		{
-			bot_pos.set(ofRandom(0,ofGetWidth()),ofRandom(0,ofGetHeight()));
-			bot_startpos.set(bot_pos);
-			return false;
+			timestep_coli_count = 0;
+			if(collide(bot_pos,mark_count))	
+			{
+				distributeBots();
+				return false;
+			}
 		}
 		return true;
 	}
 	else
 	{
-		bot_pos.set(ofRandom(0,ofGetWidth()),ofRandom(0,ofGetHeight()));
-		bot_startpos.set(bot_pos);
+		//bot_pos.set(ofRandom(0,ofGetWidth()),ofRandom(0,ofGetHeight()));
+		//bot_startpos.set(bot_pos);
+		distributeBots();
 		return false;
 	}
+}
+
+bool testApp::collide(ofVec2f this_pos, int this_mark)
+{
+	int this_index = floor(0.5+this_pos.x) + (floor(0.5+this_pos.y)) * ofGetWidth();
+	if(canvas.getPixelsRef()[this_index]==COLOR)	// check its own spot
+	{
+		if(floor(0.5+last_bot_pos.x) != floor(0.5+bot_pos.x) || floor(0.5+last_bot_pos.y)!=floor(0.5+bot_pos.y))	// if it really moved
+			return true;
+	}
+
+	for(int dy=-1;dy<=1;dy++)	// check collision in the 8-neighborhood and itself
+	{
+		for(int dx=-1;dx<=1;dx++)
+		{
+			int index = floor(0.5+this_pos.x+dx) + (floor(0.5+this_pos.y+dy)) * ofGetWidth();
+			if(index>=0 && index<ofGetWidth()*ofGetHeight() && canvas.getPixelsRef()[index]==COLOR)
+			{
+				if(marker[index]!=this_mark)
+					return true;
+			}
+		}
+	}
+	return false;
+}
+
+// find a start point at the edge map.
+void testApp::distributeBots()
+{
+	int x = ofRandom(0,ofGetWidth());
+	int y = ofRandom(0,ofGetHeight());
+	int index = x+y*ofGetWidth();
+	
+	if(edge_map.getPixelsRef()[index] == 0 && !collide(ofVec2f(x,y),-1))
+	{
+		last_bot_pos = bot_pos;
+		bot_pos.set(x,y);	// use the new position
+		mark_count++;
+		//bot_startpos.set(bot_pos);
+	}
+	else
+		distributeBots();
+
 }
 
 //--------------------------------------------------------------
@@ -106,6 +193,8 @@ void testApp::visualizedETFMap(ofVec2f *thisETFMap)
 		}
 	}
 }
+
+
 
 
 //--------------------------------------------------------------

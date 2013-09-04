@@ -1,7 +1,7 @@
 #pragma once
 #include "ofMain.h"
 
-#define THRESHOLD 100
+#define THRESHOLD 50
 
 class sob{
 public:
